@@ -1,0 +1,172 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Generated Timetable</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .lab-cell { background: #ffe4b2 !important; }
+    .classroom-color-0 { background: #e3f2fd !important; }
+    .classroom-color-1 { background: #fce4ec !important; }
+    .classroom-color-2 { background: #e8f5e9 !important; }
+    .classroom-color-3 { background: #fff3e0 !important; }
+    .classroom-color-4 { background: #ede7f6 !important; }
+    .classroom-color-5 { background: #f3e5f5 !important; }
+    .lab-label { font-weight: bold; color: #b26a00; }
+    .classroom-label { font-weight: bold; color: #1976d2; }
+    .edited-cell { background: #fff59d !important; }
+    .fixed-cell { background: #c8e6c9 !important; }
+  </style>
+  <script type="text/javascript">
+window.subjectFacultyMap = {{ subjectFacultyMap|safe }};
+function updateFacultyDropdown(cellId) {
+  var subjSel = document.getElementById('subject-' + cellId);
+  var facSel = document.getElementById('faculty-' + cellId);
+  if (!subjSel || !facSel) return;
+  var subj = subjSel.value;
+  var facs = window.subjectFacultyMap[subj] || [];
+  facSel.innerHTML = '';
+  facs.forEach(function(fac) {
+    var opt = document.createElement('option');
+    opt.value = fac;
+    opt.text = fac;
+    facSel.appendChild(opt);
+  });
+}
+// Track which cells are modified in edit mode
+var modifiedCells = {};
+function markCellEdited(cellId) {
+  var td = document.getElementById('td-' + cellId);
+  if (td) td.classList.add('edited-cell');
+  modifiedCells[cellId] = true;
+}
+function submitChangedCells() {
+  var edited = {};
+  for (var cellId in modifiedCells) {
+    var subjSel = document.getElementById('subject-' + cellId);
+    var facSel = document.getElementById('faculty-' + cellId);
+    if (subjSel && facSel) {
+      edited[cellId] = {
+        subject: subjSel.value,
+        faculty: facSel.value
+      };
+    }
+  }
+  document.getElementById('edited_cells_input').value = JSON.stringify(edited);
+  return true;
+}
+  </script>
+</head>
+<body>
+  <header><h1>Generated Timetable (Mon–Sat)</h1></header>
+  <main class="card">
+    <section>
+      <p><strong>Faculty workload limit:</strong> {{ limit }} classes/week</p>
+      {% if warnings %}
+        <div class="warning"><strong>Warnings:</strong><ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>
+      {% endif %}
+      <form method="post" action="{{ url_for('edit_mode') }}" style="display:inline;">
+        <button type="submit">{% if session.edit_mode %}Close Edit Mode{% else %}Edit Mode{% endif %}</button>
+      </form>
+    </section>
+
+    <form method="post" action="{{ url_for('save_edits') }}" id="editForm" onsubmit="return submitChangedCells();">
+    <input type="hidden" name="edited_cells" id="edited_cells_input">
+    {% for cname in class_names %}
+      {% set class_idx = loop.index0 %}
+      <section class="card classroom-label classroom-color-{{ class_idx % 6 }}">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h2>{{ cname }}</h2>
+          <form method="get" action="{{ url_for('refresh_class', class_name=cname) }}" style="margin:0;">
+            <button type="submit" title="Refresh" style="font-size:1.2em;cursor:pointer;">🔄 Refresh</button>
+          </form>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Day \ Period</th>{% for p in range(1, periods+1) %}<th>Period {{ p }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody>
+            {% for day in days %}
+              <tr>
+                <td class="day">{{ day }}</td>
+                {% for p in range(1, periods+1) %}
+                  {% set cell = schedule[cname][day][p] %}
+                  {% set is_lab = cell and cell.subject and (subjects_per_class[cname]|selectattr('name', 'equalto', cell.subject)|first).type == 'lab' %}
+                  {% set cell_id = cname ~ '-' ~ day ~ '-' ~ p %}
+                  {% set is_edited = session.get('edited_cells', {}).get(cell_id) %}
+                  <td id="td-{{ cell_id }}" class="{% if not cell %}unassigned{% elif cell.unassigned %}unassigned{% elif cell.overwork %}overwork{% endif %} {% if is_lab %}lab-cell{% endif %} {% if is_edited %}fixed-cell{% endif %}">
+                    {% if is_edited %}
+                      <div class="subject">{{ cell.subject }} {% if is_lab %}<span class="lab-label">(Lab)</span>{% endif %}</div>
+                      <div class="faculty">{{ cell.faculty }}</div>
+                    {% elif session.edit_mode %}
+                      <select name="subject-{{ cell_id }}" id="subject-{{ cell_id }}" onchange="updateFacultyDropdown('{{ cell_id }}'); markCellEdited('{{ cell_id }}')">
+                        {% for subj in subjects_per_class[cname] %}
+                          <option value="{{ subj.name }}" {% if cell and cell.subject == subj.name %}selected{% endif %}>{{ subj.name }}</option>
+                        {% endfor %}
+                      </select>
+                      <select name="faculty-{{ cell_id }}" id="faculty-{{ cell_id }}" onchange="markCellEdited('{{ cell_id }}')">
+                        {% set subj_name = cell.subject if cell else subjects_per_class[cname][0].name %}
+                        {% set facs = [] %}
+                        {% for fac in faculties %}
+                          {% if subj_name in fac.subjects %}
+                            {% set _ = facs.append(fac.name) %}
+                          {% endif %}
+                        {% endfor %}
+                        {% for fac in facs %}
+                          <option value="{{ fac }}" {% if cell and cell.faculty == fac %}selected{% endif %}>{{ fac }}</option>
+                        {% endfor %}
+                      </select>
+                      <script>updateFacultyDropdown('{{ cell_id }}');</script>
+                    {% elif cell %}
+                      <div class="subject">{{ cell.subject }} {% if is_lab %}<span class="lab-label">(Lab)</span>{% endif %}</div>
+                      <div class="faculty">{{ cell.faculty }}</div>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endfor %}
+    {% if session.edit_mode %}
+      <div style="text-align:center;margin:1em;">
+        <button type="submit">Save Changes</button>
+      </div>
+    {% endif %}
+    </form>
+
+    <section class="card">
+      <h2>Faculty Loads</h2>
+      <table>
+        <thead><tr><th>Faculty</th><th>Assigned</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for row in load_summary %}
+          <tr><td>{{ row.faculty }}</td><td>{{ row.count }}</td><td>{% if row.over_limit %}<span class="overwork">Over limit</span>{% else %}OK{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Faculty Timetables</h2>
+      {% for fac, slots in faculty_view.items() %}
+        <details class="faculty-details"><summary><strong>{{ fac }}</strong> — {{ slots|length }} classes</summary>
+          {% if slots|length==0 %}<p>No assignments</p>{% else %}
+            <table><thead><tr><th>Day</th><th>Period</th><th>Class</th><th>Subject</th><th>Flag</th></tr></thead>
+            <tbody>
+              {% for s in slots %}
+                <tr><td>{{ s.day }}</td><td>{{ s.period }}</td><td>{{ s.class }}</td><td>{{ s.subject }}</td><td>{% if s.overwork %}<span class="overwork">Overwork</span>{% endif %}</td></tr>
+              {% endfor %}
+            </tbody></table>
+          {% endif %}
+        </details>
+      {% endfor %}
+    </section>
+
+    <div class="actions"><a class="btn" href="{{ url_for('step1') }}">← New Timetable</a></div>
+  </main>
+</body>
+</html>

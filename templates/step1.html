@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Step 1 - Basic Settings</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header><h1>Timetable Generator — Step 1</h1></header>
+  <main class="card">
+    <h2>Basic Settings</h2>
+    <form method="POST" action="{{ url_for('step1') }}">
+      <div class="grid">
+        <div>
+          <label>Number of Classes</label>
+          <input type="number" name="num_classes" min="1" required>
+        </div>
+        <div>
+          <label>Periods per Day</label>
+          <input type="number" name="periods_per_day" min="1" max="7" value="7" required>
+        </div>
+        <div>
+          <label>Faculty workload limit (per week)</label>
+          <input type="number" name="workload_limit" min="1" value="28" required>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:12px;">
+        <button class="btn primary" type="submit">Next → Classes</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>
