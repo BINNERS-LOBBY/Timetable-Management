@@ -1,0 +1,25 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Step 2 - Class Names</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header><h1>Step 2 — Enter Class Names</h1></header>
+  <main class="card">
+    <form method="POST" action="{{ url_for('step2_classes') }}">
+      <div class="grid">
+        {% for i in range(1, num+1) %}
+          <div class="row">
+            <label>Class {{ i }} Name</label>
+            <input type="text" name="class_name_{{ i }}" placeholder="e.g. CSE-2nd Year" required>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="actions"><button class="btn" type="submit">Next → Subjects</button></div>
+    </form>
+  </main>
+</body>
+</html>

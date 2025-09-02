@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Step 4 - Faculties</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .fac-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <header><h1>Step 4 — Faculties</h1></header>
+  <main class="card">
+    <p>Add faculties and list subjects they can teach (hold Ctrl/⌘ to select multiple subjects).</p>
+    <form id="facForm" method="POST" action="{{ url_for('step4_faculties') }}" onsubmit="prepareFac(event)">
+      <div id="facContainer"></div>
+      <button type="button" class="btn" onclick="addFac()">+ Add Faculty</button>
+      <input type="hidden" name="faculties_json" id="faculties_json">
+      <div class="actions"><button class="btn primary" type="submit">Next</button></div>
+    </form>
+  </main>
+
+  <script>
+  // unique_subjects is a list from Flask
+  const existingSubjects = {{ unique_subjects|tojson|safe }};
+
+  function addFac() {
+    const id = Math.random().toString(36).slice(2, 9);
+    const cont = document.getElementById('facContainer');
+    const dropdownOptions = existingSubjects
+      .map((sub) => `<option value="${sub}">${sub}</option>`)
+      .join('');
+
+    cont.insertAdjacentHTML('beforeend', `
+      <div class="fac-row" id="fac_${id}">
+        <input type="text" class="fac_name" placeholder="Faculty name (e.g., Mr. Rao)" required>
+        <select class="fac_subjects" multiple required>
+          ${dropdownOptions}
+        </select>
+        <button type="button" onclick="this.parentElement.remove()">Remove</button>
+      </div>
+    `);
+  }
+
+  function prepareFac(e) {
+    e.preventDefault();
+    const rows = document.querySelectorAll('.fac-row');
+    const arr = [];
+
+    rows.forEach((r) => {
+      const name = r.querySelector('.fac_name').value.trim();
+      const subs = Array.from(r.querySelector('.fac_subjects').selectedOptions).map((opt) => opt.value);
+      if (name && subs.length) {
+        arr.push({ name, subjects: subs });
+      }
+    });
+
+    document.getElementById('faculties_json').value = JSON.stringify(arr);
+    document.getElementById('facForm').submit();
+  }
+
+  // Add initial faculty row
+  addFac();
+  </script>
+</body>
+</html>

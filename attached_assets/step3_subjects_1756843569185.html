@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Step 3 - Subjects per Class</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .subject-row {
+      display: grid;
+      grid-template-columns: 1fr 120px 120px 120px 90px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header><h1>Step 3 — Subjects per Class</h1></header>
+  <main class="card">
+    <p>For each class, add subjects and required weekly periods. Mark labs and set lab block size (3 or 4).</p>
+
+    <form id="subjectsForm" method="POST" action="{{ url_for('step3_subjects') }}" onsubmit="prepareAndSubmit(event)">
+      {% for cname in class_names %}
+        <section class="card">
+          <h3>{{ cname }}</h3>
+          <div id="container_{{ loop.index0 }}"></div>
+          <button type="button" class="btn" data-class-index="{{ loop.index0 }}" onclick="addSubjectRow(this)">+ Add Subject</button>
+        </section>
+      {% endfor %}
+
+      <input type="hidden" name="subjects_json" id="subjects_json">
+      <div class="actions"><button class="btn primary" type="submit">Next → Faculties</button></div>
+    </form>
+  </main>
+
+  <script>
+  const classNames = JSON.parse('{{ class_names|tojson|safe }}');
+  const classCount = classNames.length;
+  const subjectDetails = {}; // Store subject details here
+
+  // Add one subject row for each class by default
+  for (let i = 0; i < classCount; i++) addSubjectRow(i);
+
+  function addSubjectRow(button) {
+    const classIdx = button.dataset.classIndex;
+    const cont = document.getElementById('container_' + classIdx);
+    const id = Math.random().toString(36).slice(2, 9);
+    const dropdownOptions = Object.keys(subjectDetails)
+      .map((sub) => `<option value="${sub}">${sub}</option>`)
+      .join('');
+    const html = `
+      <div class="subject-row" id="row_${classIdx}_${id}">
+        <select class="sub_name" onchange="populateSubjectDetails(this)">
+          <option value="" disabled selected>Select Subject</option>
+          ${dropdownOptions}
+          <option value="__new__">+ New Subject</option>
+        </select>
+        <input type="text" class="new_sub_name" placeholder="New Subject Name" onblur="addNewSubject(this)" style="display:none;">
+        <select class="sub_type" onchange="toggleLabBlock(this)">
+          <option value="theory">Theory</option>
+          <option value="lab">Lab</option>
+        </select>
+        <input type="number" class="sub_periods" placeholder="Periods" min="1" value="3">
+        <select class="sub_lab_block" style="display:none;">
+          <option value="3">Block 3</option>
+          <option value="4">Block 4</option>
+        </select>
+        <button type="button" onclick="this.parentElement.remove()">Remove</button>
+      </div>`;
+    cont.insertAdjacentHTML('beforeend', html);
+  }
+
+  function populateSubjectDetails(select) {
+    const subjectName = select.value;
+    const row = select.parentElement;
+    if (subjectName === '__new__') {
+      row.querySelector('.new_sub_name').style.display = 'block';
+      row.querySelector('.new_sub_name').focus();
+    } else if (subjectDetails[subjectName]) {
+      const details = subjectDetails[subjectName];
+      row.querySelector('.new_sub_name').style.display = 'none';
+      row.querySelector('.sub_periods').value = details.periods || 3;
+      row.querySelector('.sub_type').value = details.type || 'theory';
+      toggleLabBlock(row.querySelector('.sub_type'));
+      if (details.type === 'lab') {
+        row.querySelector('.sub_lab_block').style.display = 'block';
+        row.querySelector('.sub_lab_block').value = details.lab_block || 3;
+      }
+    }
+  }
+
+  function addNewSubject(input) {
+    const newSubject = input.value.trim();
+    if (newSubject) {
+      const row = input.parentElement;
+      const type = row.querySelector('.sub_type').value;
+      const periods = parseInt(row.querySelector('.sub_periods').value, 10);
+      const labBlock = type === 'lab' ? parseInt(row.querySelector('.sub_lab_block').value, 10) : null;
+      subjectDetails[newSubject] = { periods, type, lab_block: labBlock };
+      input.style.display = 'none';
+      const select = row.querySelector('.sub_name');
+      const newOption = document.createElement('option');
+      newOption.value = newSubject;
+      newOption.textContent = newSubject;
+      select.appendChild(newOption);
+      select.value = newSubject;
+    }
+  }
+
+  function toggleLabBlock(select) {
+    const labBlock = select.parentElement.querySelector('.sub_lab_block');
+    if (select.value === 'lab') {
+      labBlock.style.display = 'block';
+    } else {
+      labBlock.style.display = 'none';
+    }
+  }
+
+  function prepareAndSubmit(e) {
+    e.preventDefault();
+    const data = {};
+    for (let i = 0; i < classCount; i++) {
+      const rows = document.querySelectorAll(`#container_${i} .subject-row`);
+      data[classNames[i]] = Array.from(rows).map((row) => {
+        const name = row.querySelector('.sub_name').value;
+        const type = row.querySelector('.sub_type').value;
+        const periods = parseInt(row.querySelector('.sub_periods').value, 10);
+        const labBlock = type === 'lab' ? parseInt(row.querySelector('.sub_lab_block').value, 10) : null;
+        return { name, type, periods, lab_block: labBlock };
+      });
+    }
+    document.getElementById('subjects_json').value = JSON.stringify(data);
+    document.getElementById('subjectsForm').submit();
+  }
+  </script>
+</body>
+</html>
