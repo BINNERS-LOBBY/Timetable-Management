@@ -14,11 +14,23 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "fallback_secret_key_for_development")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Database configuration
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+# Database configuration - supports both PostgreSQL and MySQL
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    # Fallback to MySQL configuration for external hosting
+    mysql_host = os.environ.get("MYSQL_HOST", "localhost")
+    mysql_user = os.environ.get("MYSQL_USER", "root")
+    mysql_password = os.environ.get("MYSQL_PASSWORD", "")
+    mysql_db = os.environ.get("MYSQL_DATABASE", "timetable_db")
+    database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}/{mysql_db}"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
+    "pool_timeout": 20,
+    "pool_size": 5,
+    "max_overflow": 0
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -370,10 +382,11 @@ def step3_subjects():
     
     # Get available subjects for auto-completion
     available_subjects = Subject.query.order_by(Subject.usage_count.desc(), Subject.name).all()
+    available_subjects_dict = [subject.to_dict() for subject in available_subjects]
     
     return render_template('step3_subjects.html', 
                          class_names=class_names,
-                         available_subjects=available_subjects,
+                         available_subjects=available_subjects_dict,
                          periods_per_day=periods_per_day,
                          validation_errors=validation_errors)
 
