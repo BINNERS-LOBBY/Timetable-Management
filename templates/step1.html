@@ -9,6 +9,30 @@
   <header><h1>Timetable Generator — Step 1</h1></header>
   <main class="card">
     <h2>Basic Settings</h2>
+    
+    {% if saved_timetables %}
+    <div class="saved-timetables" style="margin-bottom: 2rem;">
+      <h3>Quick Load Previous Timetables</h3>
+      <div class="timetable-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+        {% for timetable in saved_timetables %}
+        <div class="timetable-card" style="background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+          <h4 style="margin: 0 0 0.5rem 0; color: #1f2937;">{{ timetable.name }}</h4>
+          <p style="margin: 0 0 1rem 0; font-size: 0.875rem; color: #6b7280;">{{ timetable.description or 'No description' }}</p>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #9ca3af; margin-bottom: 1rem;">
+            <span>Used {{ timetable.usage_count }} times</span>
+            <span>{{ timetable.last_used.strftime('%b %d') if timetable.last_used else 'Never' }}</span>
+          </div>
+          <a href="{{ url_for('load_saved_timetable', timetable_id=timetable.id) }}" 
+             class="btn primary" 
+             style="width: 100%; text-align: center; text-decoration: none; display: block;">Load This Timetable</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e2e8f0;">
+    {% endif %}
+    
+    <h3>Create New Timetable</h3>
     <form method="POST" action="{{ url_for('step1') }}">
       <div class="grid">
         <div>

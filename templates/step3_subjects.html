@@ -12,12 +12,69 @@
       align-items: center;
       margin-bottom: 8px;
     }
+    .autocomplete {
+      position: relative;
+    }
+    .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-top: none;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
+    .autocomplete-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .autocomplete-item:hover, .autocomplete-item.active {
+      background: #e6f3ff;
+    }
+    .validation-error {
+      background: #fee;
+      border: 1px solid #f88;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+      color: #c00;
+    }
+    .validation-summary {
+      background: #f0f8ff;
+      border: 1px solid #b0d4f1;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+    }
   </style>
 </head>
 <body>
   <header><h1>Step 3 — Subjects per Class</h1></header>
   <main class="card">
     <p>For each class, add subjects and required weekly periods. Mark labs and set lab block size (3 or 4).</p>
+    
+    {% if validation_errors %}
+      <div class="validation-error">
+        <h4>⚠ Period Allocation Errors:</h4>
+        <ul>
+          {% for error in validation_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+        <p><strong>Please adjust period allocations before proceeding.</strong></p>
+      </div>
+    {% endif %}
+    
+    <div class="validation-summary">
+      <h4>📊 Quick Validation:</h4>
+      <p>Total periods available per class per week: <strong>{{ periods_per_day * 6 }}</strong> ({{ periods_per_day }} periods × 6 days)</p>
+      <p>The system will validate your allocations and warn if any class exceeds this limit.</p>
+    </div>
 
     <form id="subjectsForm" method="POST" action="{{ url_for('step3_subjects') }}" onsubmit="prepareAndSubmit(event)">
       {% for cname in class_names %}
@@ -36,7 +93,19 @@
   <script>
   const classNames = JSON.parse('{{ class_names|tojson|safe }}');
   const classCount = classNames.length;
-  const subjectDetails = {}; // Store subject details here
+  const availableSubjects = {{ available_subjects|tojson|safe }};
+  const periodsPerDay = {{ periods_per_day }};
+  const maxPeriodsPerWeek = periodsPerDay * 6;
+  const subjectDetails = {};
+  
+  // Populate subject details from database
+  availableSubjects.forEach(subject => {
+    subjectDetails[subject.name] = {
+      periods: subject.default_periods,
+      type: subject.default_type,
+      lab_block: subject.default_lab_block
+    };
+  });
 
   // Add one subject row for each class by default
   for (let i = 0; i < classCount; i++) addSubjectRow(document.querySelector(`[data-class-index="${i}"]`));
@@ -45,29 +114,100 @@
     const classIdx = button.dataset.classIndex;
     const cont = document.getElementById('container_' + classIdx);
     const id = Math.random().toString(36).slice(2, 9);
-    const dropdownOptions = Object.keys(subjectDetails)
-      .map((sub) => `<option value="${sub}">${sub}</option>`)
-      .join('');
     const html = `
       <div class="subject-row" id="row_${classIdx}_${id}">
-        <select class="sub_name" onchange="populateSubjectDetails(this)">
-          <option value="" disabled selected>Select Subject</option>
-          ${dropdownOptions}
-          <option value="__new__">+ New Subject</option>
-        </select>
-        <input type="text" class="new_sub_name" placeholder="New Subject Name" onblur="addNewSubject(this)" style="display:none;">
+        <div class="autocomplete">
+          <input type="text" class="sub_name" placeholder="Type to search subjects..." 
+                 onkeyup="showAutocomplete(this)" onblur="hideAutocomplete(this)" 
+                 onfocus="showAutocomplete(this)" onchange="populateSubjectDetails(this)">
+          <div class="autocomplete-list" id="autocomplete_${classIdx}_${id}"></div>
+        </div>
         <select class="sub_type" onchange="toggleLabBlock(this)">
           <option value="theory">Theory</option>
           <option value="lab">Lab</option>
         </select>
-        <input type="number" class="sub_periods" placeholder="Periods" min="1" value="3">
+        <input type="number" class="sub_periods" placeholder="Periods" min="1" value="3" onchange="validatePeriods()">
         <select class="sub_lab_block" style="display:none;">
           <option value="3">Block 3</option>
           <option value="4">Block 4</option>
         </select>
-        <button type="button" onclick="this.parentElement.remove()">Remove</button>
+        <button type="button" onclick="removeSubject(this)">Remove</button>
       </div>`;
     cont.insertAdjacentHTML('beforeend', html);
+    validatePeriods();
+  }
+  
+  function showAutocomplete(input) {
+    const value = input.value.toLowerCase();
+    const listDiv = input.nextElementSibling;
+    const matches = availableSubjects.filter(subject => 
+      subject.name.toLowerCase().includes(value)
+    ).slice(0, 8);
+    
+    if (matches.length > 0) {
+      listDiv.innerHTML = matches.map(subject => 
+        `<div class="autocomplete-item" onclick="selectSubject(this, '${subject.name}')">
+          <strong>${subject.name}</strong> 
+          <small>(${subject.default_periods}p, ${subject.default_type})</small>
+        </div>`
+      ).join('');
+      listDiv.style.display = 'block';
+    } else {
+      listDiv.style.display = 'none';
+    }
+  }
+  
+  function hideAutocomplete(input) {
+    setTimeout(() => {
+      input.nextElementSibling.style.display = 'none';
+    }, 200);
+  }
+  
+  function selectSubject(item, subjectName) {
+    const input = item.parentElement.previousElementSibling;
+    input.value = subjectName;
+    item.parentElement.style.display = 'none';
+    populateSubjectDetails(input);
+  }
+  
+  function removeSubject(button) {
+    button.parentElement.remove();
+    validatePeriods();
+  }
+  
+  function validatePeriods() {
+    for (let i = 0; i < classCount; i++) {
+      const container = document.getElementById(`container_${i}`);
+      const periodInputs = container.querySelectorAll('.sub_periods');
+      let total = 0;
+      
+      periodInputs.forEach(input => {
+        const periods = parseInt(input.value) || 0;
+        total += periods;
+      });
+      
+      const className = classNames[i];
+      const statusDiv = document.getElementById(`status_${i}`) || createStatusDiv(i, className);
+      
+      if (total > maxPeriodsPerWeek) {
+        statusDiv.innerHTML = `<span style="color: red;">⚠ ${total}/${maxPeriodsPerWeek} periods (${total - maxPeriodsPerWeek} excess)</span>`;
+        statusDiv.style.color = 'red';
+      } else {
+        statusDiv.innerHTML = `<span style="color: green;">✓ ${total}/${maxPeriodsPerWeek} periods</span>`;
+        statusDiv.style.color = 'green';
+      }
+    }
+  }
+  
+  function createStatusDiv(index, className) {
+    const section = document.querySelector(`[data-class-index="${index}"]`).parentElement;
+    const h3 = section.querySelector('h3');
+    const statusDiv = document.createElement('div');
+    statusDiv.id = `status_${index}`;
+    statusDiv.style.fontSize = '0.9em';
+    statusDiv.style.marginTop = '5px';
+    h3.appendChild(statusDiv);
+    return statusDiv;
   }
 
   function populateSubjectDetails(select) {

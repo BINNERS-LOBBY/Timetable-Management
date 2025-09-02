@@ -1,0 +1,270 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Faculty Timetables</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .faculty-section {
+      margin-bottom: 2rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .faculty-header {
+      background: var(--primary-color, #2563eb);
+      color: white;
+      padding: 1rem;
+      margin: 0;
+    }
+    
+    .faculty-grid {
+      display: grid;
+      grid-template-columns: 100px repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1px;
+      background: #e5e7eb;
+      margin: 1rem;
+    }
+    
+    .faculty-cell {
+      background: white;
+      padding: 0.5rem;
+      text-align: center;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+    
+    .faculty-cell.header {
+      background: #f3f4f6;
+      font-weight: bold;
+      color: #374151;
+    }
+    
+    .faculty-cell.day-header {
+      background: #e5e7eb;
+      font-weight: bold;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    }
+    
+    .faculty-cell.assigned {
+      background: #dbeafe;
+      border-left: 4px solid #3b82f6;
+    }
+    
+    .faculty-cell.overwork {
+      background: #fee2e2;
+      border-left: 4px solid #ef4444;
+    }
+    
+    .subject-name {
+      font-weight: bold;
+      color: #1f2937;
+      margin-bottom: 0.25rem;
+    }
+    
+    .class-name {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+    
+    .action-buttons {
+      margin: 1rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+    
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background: #4b5563;
+    }
+    
+    .btn-download {
+      background: #059669;
+      color: white;
+    }
+    
+    .btn-download:hover {
+      background: #047857;
+    }
+    
+    .print-layout {
+      display: none;
+    }
+    
+    @media print {
+      body { margin: 0; }
+      .action-buttons { display: none; }
+      .faculty-section { break-after: page; }
+      .print-layout { display: block; }
+      .screen-layout { display: none; }
+    }
+    
+    .stats-summary {
+      background: #f8fafc;
+      padding: 1rem;
+      margin: 1rem;
+      border-radius: 6px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #1f2937;
+    }
+    
+    .stat-label {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Faculty Timetables</h1>
+  </header>
+  
+  <main class="container">
+    <div class="action-buttons screen-layout">
+      <a href="{{ url_for('generate') }}" class="btn btn-secondary">← Back to Class Timetables</a>
+      <button onclick="downloadFacultyTimetables()" class="btn btn-download">📄 Download PDF</button>
+      <button onclick="window.print()" class="btn btn-primary">🖨️ Print All</button>
+    </div>
+    
+    {% if faculty_schedules %}
+      <!-- Summary Statistics -->
+      <div class="stats-summary screen-layout">
+        <div class="stat-item">
+          <div class="stat-number">{{ faculty_schedules|length }}</div>
+          <div class="stat-label">Total Faculty</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ periods }}</div>
+          <div class="stat-label">Periods per Day</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ days|length }}</div>
+          <div class="stat-label">Working Days</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ (periods * days|length) }}</div>
+          <div class="stat-label">Total Slots per Week</div>
+        </div>
+      </div>
+      
+      {% for faculty_name, schedule_grid in faculty_schedules.items() %}
+        <div class="faculty-section">
+          <h2 class="faculty-header">{{ faculty_name }}</h2>
+          
+          <div class="faculty-grid" style="grid-template-columns: 100px repeat({{ days|length }}, 1fr);">
+            <!-- Header row -->
+            <div class="faculty-cell header">Period</div>
+            {% for day in days %}
+              <div class="faculty-cell header">{{ day }}</div>
+            {% endfor %}
+            
+            <!-- Schedule rows -->
+            {% for period in range(1, periods + 1) %}
+              <div class="faculty-cell day-header">{{ period }}</div>
+              {% for day in days %}
+                {% set assignment = schedule_grid[day][period] %}
+                <div class="faculty-cell {% if assignment %}assigned{% if assignment.overwork %} overwork{% endif %}{% endif %}">
+                  {% if assignment %}
+                    <div class="subject-name">{{ assignment.subject }}</div>
+                    <div class="class-name">{{ assignment.class }}</div>
+                    {% if assignment.overwork %}
+                      <small style="color: #ef4444;">⚠ Overload</small>
+                    {% endif %}
+                  {% else %}
+                    <span style="color: #9ca3af;">Free</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+          
+          <!-- Faculty workload summary -->
+          {% set total_periods = schedule_grid.values() | map('values') | sum | selectattr | list | length %}
+          <div class="stats-summary">
+            <div class="stat-item">
+              <div class="stat-number">{{ total_periods }}</div>
+              <div class="stat-label">Total Periods Assigned</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">{{ ((total_periods / (periods * days|length)) * 100) | round(1) }}%</div>
+              <div class="stat-label">Schedule Utilization</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="card">
+        <h2>No Faculty Timetable Data</h2>
+        <p>No timetable data found. Please <a href="{{ url_for('step1') }}">generate a timetable</a> first.</p>
+      </div>
+    {% endif %}
+  </main>
+  
+  <script>
+    function downloadFacultyTimetables() {
+      // Simple implementation - opens print dialog for PDF save
+      // In a full implementation, you could use libraries like jsPDF or send to server
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(document.documentElement.outerHTML);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    }
+    
+    // Auto-adjust grid columns based on number of days
+    document.addEventListener('DOMContentLoaded', function() {
+      const grids = document.querySelectorAll('.faculty-grid');
+      grids.forEach(grid => {
+        const dayCount = {{ days|length }};
+        grid.style.gridTemplateColumns = `100px repeat(${dayCount}, 1fr)`;
+      });
+    });
+  </script>
+</body>
+</html>

@@ -55,19 +55,95 @@ function submitChangedCells() {
   document.getElementById('edited_cells_input').value = JSON.stringify(edited);
   return true;
 }
+
+// Save dialog functions
+function showSaveDialog() {
+  document.getElementById('saveDialog').style.display = 'block';
+  document.getElementById('timetableName').focus();
+}
+
+function hideSaveDialog() {
+  document.getElementById('saveDialog').style.display = 'none';
+}
+
+// Download functionality
+function downloadTimetable(format) {
+  if (format === 'pdf') {
+    window.print();
+  } else if (format === 'excel') {
+    // Simple CSV export
+    let csv = 'Class,Day,Period,Subject,Faculty\n';
+    document.querySelectorAll('.timetable-class').forEach(classSection => {
+      const className = classSection.querySelector('h3').textContent;
+      classSection.querySelectorAll('td[id^="td-"]').forEach(cell => {
+        const cellId = cell.id.replace('td-', '');
+        const parts = cellId.split('-');
+        if (parts.length === 3) {
+          const day = parts[1];
+          const period = parts[2];
+          const content = cell.textContent.trim();
+          if (content && content !== 'Free') {
+            const lines = content.split('\n').filter(line => line.trim());
+            if (lines.length >= 2) {
+              csv += `"${className}","${day}","${period}","${lines[0]}","${lines[1]}"\n`;
+            }
+          }
+        }
+      });
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'timetable.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+}
   </script>
 </head>
 <body>
   <header><h1>Generated Timetable (Mon–Sat)</h1></header>
   <main class="card">
     <section>
-      <p><strong>Faculty workload limit:</strong> {{ limit }} classes/week</p>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <p><strong>Faculty workload limit:</strong> {{ limit }} classes/week</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <a href="{{ url_for('faculty_timetable_view') }}" class="btn" style="background: #059669; color: white; text-decoration: none;">👥 Faculty View</a>
+          <form method="post" action="{{ url_for('edit_mode') }}" style="display:inline;">
+            <button type="submit" class="btn" style="background: {% if edit_mode %}#ef4444{% else %}#3b82f6{% endif %}; color: white;">{% if edit_mode %}Close Edit Mode{% else %}✏️ Edit Mode{% endif %}</button>
+          </form>
+          <button onclick="showSaveDialog()" class="btn" style="background: #7c3aed; color: white;">💾 Save Timetable</button>
+        </div>
+      </div>
+      
       {% if warnings %}
         <div class="warning"><strong>Warnings:</strong><ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>
       {% endif %}
-      <form method="post" action="{{ url_for('edit_mode') }}" style="display:inline;">
-        <button type="submit">{% if session.edit_mode %}Close Edit Mode{% else %}Edit Mode{% endif %}</button>
-      </form>
+      
+      <!-- Save Dialog -->
+      <div id="saveDialog" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: 300px;">
+          <h3 style="margin-top: 0;">Save Timetable</h3>
+          <form method="post" action="{{ url_for('save_current_timetable') }}">
+            <div style="margin-bottom: 1rem;">
+              <label for="timetableName" style="display: block; margin-bottom: 0.5rem;">Name:</label>
+              <input type="text" id="timetableName" name="name" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <label for="timetableDescription" style="display: block; margin-bottom: 0.5rem;">Description (optional):</label>
+              <textarea id="timetableDescription" name="description" rows="3" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+              <button type="button" onclick="hideSaveDialog()" class="btn" style="background: #6b7280; color: white;">Cancel</button>
+              <button type="submit" class="btn" style="background: #7c3aed; color: white;">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </section>
 
     <form method="post" action="{{ url_for('save_edits') }}" id="editForm" onsubmit="return submitChangedCells();">
