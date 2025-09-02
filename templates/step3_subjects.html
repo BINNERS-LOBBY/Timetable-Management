@@ -187,21 +187,31 @@
       });
       
       const className = classNames[i];
-      const statusDiv = document.getElementById(`status_${i}`) || createStatusDiv(i, className);
+      let statusDiv = document.getElementById(`status_${i}`);
+      if (!statusDiv) {
+        statusDiv = createStatusDiv(i, className);
+      }
       
-      if (total > maxPeriodsPerWeek) {
-        statusDiv.innerHTML = `<span style="color: red;">⚠ ${total}/${maxPeriodsPerWeek} periods (${total - maxPeriodsPerWeek} excess)</span>`;
-        statusDiv.style.color = 'red';
-      } else {
-        statusDiv.innerHTML = `<span style="color: green;">✓ ${total}/${maxPeriodsPerWeek} periods</span>`;
-        statusDiv.style.color = 'green';
+      if (statusDiv) {
+        if (total > maxPeriodsPerWeek) {
+          statusDiv.innerHTML = `<span style="color: red;">⚠ ${total}/${maxPeriodsPerWeek} periods (${total - maxPeriodsPerWeek} excess)</span>`;
+          statusDiv.style.color = 'red';
+        } else {
+          statusDiv.innerHTML = `<span style="color: green;">✓ ${total}/${maxPeriodsPerWeek} periods</span>`;
+          statusDiv.style.color = 'green';
+        }
       }
     }
   }
   
   function createStatusDiv(index, className) {
-    const section = document.querySelector(`[data-class-index="${index}"]`).parentElement;
+    const button = document.querySelector(`[data-class-index="${index}"]`);
+    if (!button) return null;
+    
+    const section = button.parentElement;
     const h3 = section.querySelector('h3');
+    if (!h3) return null;
+    
     const statusDiv = document.createElement('div');
     statusDiv.id = `status_${index}`;
     statusDiv.style.fontSize = '0.9em';

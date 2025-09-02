@@ -14,14 +14,14 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "fallback_secret_key_for_development")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Database configuration - supports both PostgreSQL and MySQL
+# Database configuration - using InfinityFree MySQL credentials
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
-    # Fallback to MySQL configuration for external hosting
-    mysql_host = os.environ.get("MYSQL_HOST", "localhost")
-    mysql_user = os.environ.get("MYSQL_USER", "root")
-    mysql_password = os.environ.get("MYSQL_PASSWORD", "")
-    mysql_db = os.environ.get("MYSQL_DATABASE", "timetable_db")
+    # InfinityFree MySQL configuration
+    mysql_host = "sql100.infinityfree.com"
+    mysql_user = "if0_39811633"
+    mysql_password = "dbPassword"
+    mysql_db = "dbUser"
     database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}/{mysql_db}"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
@@ -66,35 +66,40 @@ def validate_periods_allocation(class_names, subjects_per_class, periods_per_day
 
 def populate_default_subjects():
     """Populate database with common subjects if empty"""
-    if Subject.query.count() == 0:
-        default_subjects = [
-            {'name': 'Mathematics', 'default_periods': 6, 'default_type': 'theory'},
-            {'name': 'Physics', 'default_periods': 5, 'default_type': 'theory'},
-            {'name': 'Chemistry', 'default_periods': 5, 'default_type': 'theory'},
-            {'name': 'Biology', 'default_periods': 4, 'default_type': 'theory'},
-            {'name': 'English', 'default_periods': 4, 'default_type': 'theory'},
-            {'name': 'Computer Science', 'default_periods': 4, 'default_type': 'theory'},
-            {'name': 'Physics Lab', 'default_periods': 4, 'default_type': 'lab', 'default_lab_block': 2},
-            {'name': 'Chemistry Lab', 'default_periods': 4, 'default_type': 'lab', 'default_lab_block': 2},
-            {'name': 'Biology Lab', 'default_periods': 3, 'default_type': 'lab', 'default_lab_block': 3},
-            {'name': 'Computer Lab', 'default_periods': 4, 'default_type': 'lab', 'default_lab_block': 2},
-            {'name': 'History', 'default_periods': 3, 'default_type': 'theory'},
-            {'name': 'Geography', 'default_periods': 3, 'default_type': 'theory'},
-            {'name': 'Economics', 'default_periods': 4, 'default_type': 'theory'},
-            {'name': 'Political Science', 'default_periods': 3, 'default_type': 'theory'},
-            {'name': 'Physical Education', 'default_periods': 2, 'default_type': 'theory'},
-        ]
-        
-        for subj_data in default_subjects:
-            subject = Subject(
-                name=subj_data['name'],
-                default_periods=subj_data['default_periods'],
-                default_type=subj_data['default_type'],
-                default_lab_block=subj_data.get('default_lab_block', 0)
-            )
-            db.session.add(subject)
+    try:
+        if Subject.query.count() == 0:
+            default_subjects = [
+                {'name': 'Mathematics', 'default_periods': 6, 'default_type': 'theory'},
+                {'name': 'Physics', 'default_periods': 5, 'default_type': 'theory'},
+                {'name': 'Chemistry', 'default_periods': 5, 'default_type': 'theory'},
+                {'name': 'Biology', 'default_periods': 4, 'default_type': 'theory'},
+                {'name': 'English', 'default_periods': 4, 'default_type': 'theory'},
+                {'name': 'Computer Science', 'default_periods': 4, 'default_type': 'theory'},
+                {'name': 'Physics Lab', 'default_periods': 4, 'default_type': 'lab', 'default_lab_block': 2},
+                {'name': 'Chemistry Lab', 'default_periods': 4, 'default_type': 'lab', 'default_lab_block': 2},
+                {'name': 'Biology Lab', 'default_periods': 3, 'default_type': 'lab', 'default_lab_block': 3},
+                {'name': 'Computer Lab', 'default_periods': 4, 'default_type': 'lab', 'default_lab_block': 2},
+                {'name': 'History', 'default_periods': 3, 'default_type': 'theory'},
+                {'name': 'Geography', 'default_periods': 3, 'default_type': 'theory'},
+                {'name': 'Economics', 'default_periods': 4, 'default_type': 'theory'},
+                {'name': 'Political Science', 'default_periods': 3, 'default_type': 'theory'},
+                {'name': 'Physical Education', 'default_periods': 2, 'default_type': 'theory'},
+            ]
+            
+            for subj_data in default_subjects:
+                subject = Subject(
+                    name=subj_data['name'],
+                    default_periods=subj_data['default_periods'],
+                    default_type=subj_data['default_type'],
+                    default_lab_block=subj_data.get('default_lab_block', 0)
+                )
+                db.session.add(subject)
         
         db.session.commit()
+    except Exception as e:
+        logging.warning(f"Could not populate default subjects: {e}")
+        # Continue without database if there's an issue
+        pass
 
 def choose_faculty_for_slot(subject, day_idx, period, faculties, slot_busy, load, limit):
     """Choose the best faculty for a given slot based on availability and workload"""
@@ -381,8 +386,13 @@ def step3_subjects():
             return render_template('error.html', msg=f'Invalid subjects data: {e}')
     
     # Get available subjects for auto-completion
-    available_subjects = Subject.query.order_by(Subject.usage_count.desc(), Subject.name).all()
-    available_subjects_dict = [subject.to_dict() for subject in available_subjects]
+    try:
+        available_subjects = Subject.query.order_by(Subject.usage_count.desc(), Subject.name).all()
+        available_subjects_dict = [subject.to_dict() for subject in available_subjects]
+    except Exception as e:
+        # Fallback to empty list if database isn't connected
+        available_subjects_dict = []
+        logging.warning(f"Could not fetch subjects from database: {e}")
     
     return render_template('step3_subjects.html', 
                          class_names=class_names,
