@@ -1,0 +1,21 @@
+body { font-family: system-ui, Arial, sans-serif; background: #f4f6f9; margin: 0; color: #222; }
+header { background: #2d89ef; color: #fff; padding: 16px; text-align: center; }
+main { max-width: 1100px; margin: 24px auto; padding: 12px; }
+.card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.row { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 12px; }
+label { font-weight: 600; }
+input[type="number"], input[type="text"], select { padding: 10px; border: 1px solid #c9d3e0; border-radius: 8px; background: #f9fbff; }
+.btn { display: inline-block; background: #2d89ef; color: #fff; border: 0; padding: 10px 16px; border-radius: 10px; cursor: pointer; text-decoration: none; }
+.btn.primary { background: #1e6bd6; }
+.btn:hover { filter: brightness(0.95); }
+
+table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+thead th { background: #2d89ef; color: #fff; padding: 8px; }
+th, td { border: 1px solid #dde3ec; padding: 8px; text-align: center; }
+td.day { font-weight: 700; background: #f1f6ff; }
+.unassigned { background: #fff3cd; } /* amber */
+.overwork { color: #d03737; font-weight: 700; }
+.warning { background: #fff3f3; border: 1px solid #ffd1d1; color: #b30000; padding: 10px; border-radius: 8px; }
+.faculty-details { margin-bottom: 10px; }
+.actions { text-align: center; margin: 16px 0; }

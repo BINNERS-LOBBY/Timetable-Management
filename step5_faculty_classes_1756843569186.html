@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Step 5 - Faculty-Class Assignment</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header><h1>Step 5 — Faculty-Class Assignment</h1></header>
+  <main class="card">
+    <p>Assign faculties to classes based on the subjects they teach.</p>
+    <form id="facClassForm" method="POST" action="{{ url_for('step5_faculty_classes') }}" onsubmit="prepareFacClass(event)">
+      <div id="facClassContainer">
+        {% for fac in faculties %}
+          <section class="card">
+            <h3>{{ fac.name }} (Subjects: {{ fac.subjects | join(', ') }})</h3>
+            <div>
+              {% for cname in class_names %}
+                <div style="margin-bottom:8px;">
+                  <label><strong>{{ cname }}</strong>:</label>
+                  <select class="fac_class_subject" data-faculty="{{ fac.name }}" data-class="{{ cname }}">
+                    <option value="">-- Select Theory Subject --</option>
+                    {% for sub in fac.subjects %}
+                      {% if not (subjects_per_class[cname]|selectattr('name', 'equalto', sub)|first).type == 'lab' %}
+                        <option value="{{ sub }}">{{ sub }}</option>
+                      {% endif %}
+                    {% endfor %}
+                  </select>
+                  <select class="fac_class_lab" data-faculty="{{ fac.name }}" data-class="{{ cname }}">
+                    <option value="">-- Select Lab --</option>
+                    {% for sub in fac.subjects %}
+                      {% if (subjects_per_class[cname]|selectattr('name', 'equalto', sub)|first).type == 'lab' %}
+                        <option value="{{ sub }}">{{ sub }}</option>
+                      {% endif %}
+                    {% endfor %}
+                  </select>
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="faculty_classes_json" id="faculty_classes_json">
+      <div class="actions"><button class="btn primary" type="submit">Generate Timetable</button></div>
+    </form>
+  </main>
+
+  <script>
+    function prepareFacClass(e) {
+      e.preventDefault();
+      const data = {};
+      // Handle theory subjects
+      document.querySelectorAll('.fac_class_subject').forEach(select => {
+        const fac = select.dataset.faculty;
+        const cname = select.dataset.class;
+        const subject = select.value;
+        if (subject) {
+          if (!data[fac]) data[fac] = [];
+          data[fac].push({ class: cname, subject: subject, type: 'theory' });
+        }
+      });
+      // Handle lab subjects
+      document.querySelectorAll('.fac_class_lab').forEach(select => {
+        const fac = select.dataset.faculty;
+        const cname = select.dataset.class;
+        const subject = select.value;
+        if (subject) {
+          if (!data[fac]) data[fac] = [];
+          data[fac].push({ class: cname, subject: subject, type: 'lab' });
+        }
+      });
+      document.getElementById('faculty_classes_json').value = JSON.stringify(data);
+      document.getElementById('facClassForm').submit();
+    }
+  </script>
+</body>
+</html>
